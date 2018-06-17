@@ -1,0 +1,1144 @@
+---
+title: "ALP Refugee inclusion"
+author: "Claire Adida, Adeline Lo & Melina Platas Izama"
+date: "6/17/2018"
+output: pdf_document
+fontsize: 10pt
+geometry: margin=0.75in
+---
+
+This document is meant to be a replicable file for any analysis conducted on the data collected by Adida, Lo and Platas Izama (ALP) in the project ``Engendering empathy among Americans can promote inclusionary behavior toward Syrian refugees'' (2018). This is the full dataset of 5,400 observations.
+
+Key dependent variables are $Y2$ and $Y6$, secondary dependent variables are $Y1$ and $Backlash$ (`survey_neg`). Below is a list of some of the most commonly used variables and short descriptions of each. Note some of the variables described below will be created in the data cleaning portion of this rmd file. For a longer description on all variables in the dataset, please see the ALP codebook.
+
+
+
+ Name                         Description
+ ---------------------------- ---------------------------------------------------------
+  `Treatment_Group`             Categorical variable taking values 1-6
+  `Control`                     Binary variable for whether respondent was randomized Control treatment
+  `Empathy`                     Binary variable for whether respondent was randomized Empathy treatment
+  `Persuasion`                  Binary variable for whether respondent was randomized Information treatment
+  `sex`                         Binary variable for whether respondent is female (1) or male (0)
+  `birthyr`                     Continuous variable for year of birth of respondent
+  `birthcountry`                Categorical variable for country of birth of respondent
+  `educ`                        Ordered categorical variable for education level of respondent (1 lowest, 6 highest)
+  `religpew`                    Ordered categorical variable for Pew religion of respondent
+  `partyid3`                    3-pt party ID variable, inclusive of categories for other and not sure
+  `ethnocentric1`               Continuous variable for adapted ethnocentric measure of respondent
+  `choose_muslim`               Binary variable (Y1) for whether the respondent chooses the Muslim (1) profile or Christian (0)           
+  `Y2/Y3`                       Respondent scale of acceptance of refugee 1/2 in each presented conjoint profile pair, from 1-7 
+  `Y4`                          Binary variable for whether respondent favors accepting refugee passing gov screening
+  `Y6_new`                      Binary variable for whether respondent will letter to next President of US supporting refugees
+  `survey_neg`                  Binary variable (Backlash) for whether the respondent wrote a negative evaluation of the survey (1) or not (0)
+
+# Data cleaning
+
+The original data is set up to reflect the YouGov data storage system, which requires further cleaning and arrangement before analysis. Below are pre-analysis cleaning steps.
+
+```{r setup, include=FALSE}
+rm(list=ls())
+# libraries
+library(haven)
+library(pander)
+library(dplyr)
+library(plyr)
+library(sandwich)
+library(lmtest)
+library(data.table)
+library(devtools)
+library(reshape2)
+library(glmnet)
+library(cjoint)
+#for plots
+library(ggplot2)
+library(plotly)
+library(calibrate)
+require(XML)
+library(memisc)
+load("replicationdata.RData")
+```
+
+## Conjoint variables
+For variables on gender, Male is coded as 1 while Female is coded as 0; 8 codes for skipped.
+Note `Refugee1_Attribute6` describes the country the refugee profile is from, and all refugees were designed to come from Syria.
+
+The 1st pair of refugees are denoted by an 'a' after R1 or R2, 2nd pair of refugees are denoted by a 'b' after R1 or R2, 3rd pair are denoted by 'c' after R1 or R2.
+```{r}
+#gender: 1=Male, 0=Female
+data$R1a_sex<-data$Refugee1_Attribute1
+data$R1a_sex[data$R1a_sex==2]<-0
+data$R2a_sex<-data$Refugee2_Attribute1
+data$R2a_sex[data$R2a_sex==2]<-0
+#sex
+data$R1b_sex<-data$Refugee1a_Attribute1
+data$R1b_sex[data$R1b_sex==2]<-0
+data$R2b_sex<-data$Refugee2a_Attribute1
+data$R2b_sex[data$R2b_sex==2]<-0
+data$R1c_sex<-data$Refugee1b_Attribute1
+data$R1c_sex[data$R1c_sex==2]<-0
+data$R2c_sex<-data$Refugee2b_Attribute1
+data$R2c_sex[data$R2c_sex==2]<-0
+#religion: 1=Muslim, 0=Christian
+data$R1a_muslim<-data$Refugee1_Attribute2
+data$R1a_muslim[data$R1a_muslim==1]<-0
+data$R1a_muslim[data$R1a_muslim==2]<-1
+data$R2a_muslim<-data$Refugee2_Attribute2
+data$R2a_muslim[data$R2a_muslim==1]<-0
+data$R2a_muslim[data$R2a_muslim==2]<-1
+data$R1b_muslim<-data$Refugee1a_Attribute2
+data$R1b_muslim[data$R1b_muslim==1]<-0
+data$R1b_muslim[data$R1b_muslim==2]<-1
+data$R2b_muslim<-data$Refugee2a_Attribute2
+data$R2b_muslim[data$R2b_muslim==1]<-0
+data$R2b_muslim[data$R2b_muslim==2]<-1
+data$R1c_muslim<-data$Refugee1b_Attribute2
+data$R1c_muslim[data$R1c_muslim==1]<-0
+data$R1c_muslim[data$R1c_muslim==2]<-1
+data$R2c_muslim<-data$Refugee2b_Attribute2
+data$R2c_muslim[data$R2c_muslim==1]<-0
+data$R2c_muslim[data$R2c_muslim==2]<-1
+#profession: 1=Farmer, 2=Teacher, 3=Doctor
+data$R1a_job<-data$Refugee1_Attribute3
+data$R2a_job<-data$Refugee2_Attribute3
+data$R1b_job<-data$Refugee1a_Attribute3
+data$R2b_job<-data$Refugee2a_Attribute3
+data$R1c_job<-data$Refugee1b_Attribute3
+data$R2c_job<-data$Refugee2b_Attribute3
+#language: 1=Fluent, 2=Broken, 3=None
+data$R1a_english<-data$Refugee1_Attribute4
+data$R2a_english<-data$Refugee2_Attribute4
+data$R1b_english<-data$Refugee1a_Attribute4
+data$R2b_english<-data$Refugee2a_Attribute4
+data$R1c_english<-data$Refugee1b_Attribute4
+data$R2c_english<-data$Refugee2b_Attribute4
+#age: 1=20, 2=40, 3=60
+data$R1a_age<-data$Refugee1_Attribute5
+data$R2a_age<-data$Refugee2_Attribute5
+data$R1b_age<-data$Refugee1a_Attribute5
+data$R2b_age<-data$Refugee2a_Attribute5
+data$R1c_age<-data$Refugee1b_Attribute5
+data$R2c_age<-data$Refugee2b_Attribute5
+# Number of Muslim profiles
+data$num_muslim<-NA
+data$num_muslim<-rowSums(data[, c("R1a_muslim","R2a_muslim","R1b_muslim","R2b_muslim","R1c_muslim","R2c_muslim")])
+data$num_muslim<-scale(data$num_muslim)
+```
+
+## Respondent covariates
+Retain `immigrant`, `birthyr`, `race`, `educ`, `votereg` (voter registration), `newsint` (political interest) variables. Create several different versions of variable.
+```{r}
+data$immigrant1<-data$immigrant
+data$immigrant1[data$immigrant1==0]<-1
+data$immigrant1[data$immigrant1==3]<-2
+data$immigrant1[data$immigrant1==4]<-3
+data$immigrant1[data$immigrant1==5]<-4
+data$immigrant2<-ifelse(data$immigrant==5,1,0) #only if respondent and both parents/grandparents are all born in USA code as 1, otherwise 0
+#birthstate
+data$birthstate<-data$S2
+#country of birth
+data$birthcountry<-data$S3
+#gender, M=1, F=0
+data$sex<-data$gender
+data$sex[data$sex==2]<-0
+#state of residence
+data$residstate<-data$inputstate
+  # coarsened geographic variable for where in states living (inputstate)
+  # use regional divisions by US Census Bureau (https://en.wikipedia.org/wiki/List_of_regions_of_the_United_States)
+data$residstate[data$residstate==9|data$residstate==23|data$residstate==25|data$residstate==33|data$residstate==44|data$residstate==50]<-"Division1" #New England (Connecticut, Maine, Massachusetts, New Hampshire, Rhode Island, and Vermont)
+data$residstate[data$residstate==34|data$residstate==36|data$residstate==42]<-"Division2" #(New Jersey, New York, and Pennsylvania)
+data$residstate[data$residstate==17|data$residstate==18|data$residstate==26|data$residstate==39|data$residstate==55]<-"Division3" #East North Central (Illinois, Indiana, Michigan, Ohio, and Wisconsin)
+data$residstate[data$residstate==19|data$residstate==20|data$residstate==27|data$residstate==29|data$residstate==31|data$residstate==38|data$residstate==46]<-"Division4" #(Iowa, Kansas, Minnesota, Missouri, Nebraska, North Dakota, and South Dakota)
+data$residstate[data$residstate==10|data$residstate==12|data$residstate==13|data$residstate==24|data$residstate==37|data$residstate==45|data$residstate==51|data$residstate==11|data$residstate==54]<-"Division5" #(Delaware, Florida, Georgia, Maryland, North Carolina, South Carolina, Virginia, District of Columbia, and West Virginia)
+data$residstate[data$residstate==1|data$residstate==21|data$residstate==28|data$residstate==47]<-"Division6" #East South Central (Alabama, Kentucky, Mississippi, and Tennessee)
+data$residstate[data$residstate==5|data$residstate==22|data$residstate==40|data$residstate==48]<-"Division7" #(Arkansas, Louisiana, Oklahoma, and Texas)
+data$residstate[data$residstate==4|data$residstate==8|data$residstate==16|data$residstate==30|data$residstate==32|data$residstate==35|data$residstate==49|data$residstate==56]<-"Division8"#(Arizona, Colorado, Idaho, Montana, Nevada, New Mexico, Utah, and Wyoming)
+data$residstate[data$residstate==2|data$residstate==6|data$residstate==15|data$residstate==41|data$residstate==53]<-"Division9"#(Alaska, California, Hawaii, Oregon, and Washington)
+data$residstate<-as.factor(data$residstate)
+#marital status
+data$marital_status<-data$marstat
+#employment status
+data$employment_status<-data$employ
+#family income
+data$family_income<-data$faminc
+#3 point party ID: 1=democrat, 2=republican, 3=independent, 4=other, 5=not sure
+data$partyid3<-data$pid3
+#3 point party ID: 1=democrat, 2=republican, 3=independent, 4=other, 5=not sure
+data$partyid3<-data$pid3
+data$partyid3_names<-data$partyid3
+data$partyid3_names[data$partyid3_names==1]<-"Democrat"
+data$partyid3_names[data$partyid3_names==2]<-"Republican"
+data$partyid3_names[data$partyid3_names==3]<-"Independent"
+data$partyid3_names[data$partyid3_names==4]<-"Other"
+data$partyid3_names[data$partyid3_names==5]<-"Not Sure"
+data$partyid3_names<-as.factor(data$partyid3_names)
+#7 point party ID: 1=strong dem, 2=not strong dem, 3=lean dem, 4=indep, 5=lean rep, 6=not strong rep, 7=strong repu, 8=not sure
+data$partyid7<-data$pid7
+# ideology
+data$ideology<-data$ideo5
+``` 
+
+## Refugee knowledge questions
+These variables code for whether the respondent knew a number of different facts related to refugees.
+```{r}
+data$info1<- data$S4# Number of Syrian refugees admitted into US post 9/11
+data$info2<- data$S5# US admitted proportionally more/fewer refugees than Canada
+data$info3<- data$S6# US admitted proportionally more/fewer refugees than France
+data$info4<- data$S7# US admitted proportionally more/fewer refugees than Germany
+```
+
+## Ethnocentric questions
+The original measure includes 24 items, each weighted equally. For eight items, each weighted equally with 5 points each, we will consider anyone scoring above 27 as high ethnocentric and anyone scoring below 17 as low ethnocentric, which is directly scaled from the original scoring scheme.
+```{r}
+data$ethnocentric1<-rowSums(data[,c("S8_1","S8_2","S8_3","s8_4","S8_5","S8_6","S8_7","S8_8")])#raw ethnocentric score
+data$ethnocentric2<-data$ethnocentric1 #high is >27, 27>=mid>=17, 17>low
+data$ethnocentric2[data$ethnocentric1<17]<-0
+data$ethnocentric2[data$ethnocentric1<=27 & data$ethnocentric1>=17]<-1
+data$ethnocentric2[data$ethnocentric1>27]<-2
+```
+
+## Information treatment specific questions
+`SP1a` asks the respondent if the information text is new information (note in data, this variable is called "Persuasion"). Yes is coded as a 1, No as a 0.
+`SP1b` asks respondent if they believe US resettled proportinally more, fewer or about the same refugees as other democracies such as Canada, France or Germany. More is coded as 1, Fewer as 2, and Same as 3.
+```{r}
+data$persuasion_infonew<-data$SP1a
+data$persuasion_infonew<-ifelse(data$persuasion_infonew==2,0,1)#recode as 1 if new, 0 otherwise.
+```
+
+## Outcome variables
+Outcome variables include Y1, Y2, Y3, Y4, Y6. Y1-Y3 are collected several times for each respondent. Y4 and Y6 (as well as backlash) are collected once per respondent.
+```{r}
+#Y1: refugee 1 or refugee 2?
+  #for refugee pair a
+#`SC1` (Control)/`SE2` (Empathy)/`SP2` (Persuasion) is a variable that asks whether the respondent would prefer Refugee 1a or Refugee 2a admitted to the United States, where Refugee 1a is coded as 1 and Refugee 2a is coded as 2.
+data$y1_a<-data$SC1
+data$y1_a<-ifelse(is.na(data$y1_a)&(data$Treatment_Group==3|data$Treatment_Group==4),data$SE2,data$y1_a)
+data$y1_a<-ifelse(is.na(data$y1_a)&(data$Treatment_Group==5|data$Treatment_Group==6),data$SP2,data$y1_a)
+  #recode into refugee1=0, refugee2=1
+data$y1_a[data$y1_a==1]<-0
+data$y1_a[data$y1_a==2]<-1
+  #for refugee pair b
+#`SC1a` (Control)/`SE2a` (Empathy)/`SP2a` (Persuasion) is a variable that asks whether the respondent would prefer Refugee 1b or Refugee 2b admitted to the United States, where Refugee 1b is coded as 1 and Refugee 2b is coded as 2.
+data$y1_b<-data$SC1
+data$y1_b<-ifelse(is.na(data$y1_b)&(data$Treatment_Group==3|data$Treatment_Group==4),data$SE2a,data$y1_b)
+data$y1_b<-ifelse(is.na(data$y1_b)&(data$Treatment_Group==5|data$Treatment_Group==6),data$SP2a,data$y1_b)
+  #recode into refugee1=0, refugee2=1
+data$y1_b[data$y1_b==1]<-0
+data$y1_b[data$y1_b==2]<-1
+  #for refugee pair c
+#`SC1b` (Control)/`SE2b` (Empathy)/`SP2b` (Persuasion) is a variable that asks whether the respondent would prefer Refugee 1c or Refugee 2c admitted to the United States, where Refugee 1c is coded as 1 and Refugee 2c is coded as 2.
+data$y1_c<-data$SC1
+data$y1_c<-ifelse(is.na(data$y1_c)&(data$Treatment_Group==3|data$Treatment_Group==4),data$SE2b,data$y1_c)
+data$y1_c<-ifelse(is.na(data$y1_c)&(data$Treatment_Group==5|data$Treatment_Group==6),data$SP2b,data$y1_c)
+  #recode into refugee1=0, refugee2=1
+data$y1_c[data$y1_c==1]<-0
+data$y1_c[data$y1_c==2]<-1
+
+#Y2 (refugee 1)
+  #for refugee pair a
+#`SC3` (Control)/`SE4` (Empathy)/`SP4` (Persuasion) is a variable that asks whether the respondent thinks the US should (not) absolutely admit Refugee 1a, where 1 is NOT and 7 is should. 
+data$y2_a<-data$SC3 #need to combine variables so that new variable takes on values 
+data$y2_a<-ifelse((data$Treatment_Group==3|data$Treatment_Group==4),data$SE4,data$y2_a)#3,4 are Empathy
+data$y2_a<-ifelse((data$Treatment_Group==5|data$Treatment_Group==6),data$SP4,data$y2_a)#5,6 are Persuasion
+  #for refugee pair b
+#`SC3a` (Control)/`SE4a` (Empathy)/`SP4a` (Persuasion) is a variable that asks whether the respondent thinks the US should (not) absolutely admit Refugee 1b, where 1 is NOT and 7 is should. 
+data$y2_b<-data$SC3a #need to combine variables so that new variable takes on values 
+data$y2_b<-ifelse((data$Treatment_Group==3|data$Treatment_Group==4),data$SE4a,data$y2_b)
+data$y2_b<-ifelse((data$Treatment_Group==5|data$Treatment_Group==6),data$SP4a,data$y2_b)
+  #for refugee pair c
+#`SC3b` (Control)/`SE4b` (Empathy)/`SP4b` (Persuasion) is a variable that asks whether the respondent thinks the US should (not) absolutely admit Refugee 1c, where 1 is NOT and 7 is should. 
+data$y2_c<-data$SC3b
+data$y2_c<-ifelse((data$Treatment_Group==3|data$Treatment_Group==4),data$SE4b,data$y2_c)
+data$y2_c<-ifelse((data$Treatment_Group==5|data$Treatment_Group==6),data$SP4b,data$y2_c)
+
+#Y3 (refugee 2)
+#`SC4` (Control)/`SE5` (Empathy)/`SP5` (Persuasion) is a variable that asks whether the respondent thinks the US should (not) absolutely admit Refugee 2a, where 1 is NOT and 7 is should. 
+data$y3_a<-data$SC4
+data$y3_a<-ifelse((data$Treatment_Group==3|data$Treatment_Group==4),data$SE5,data$y3_a)
+data$y3_a<-ifelse((data$Treatment_Group==5|data$Treatment_Group==6),data$SP5,data$y3_a)
+#`SC4a` (Control)/`SE5a` (Empathy)/`SP5a` (Persuasion) is a variable that asks whether the respondent thinks the US should (not) absolutely admit Refugee 2b, where 1 is NOT and 7 is should. 
+data$y3_b<-data$SC4a
+data$y3_b<-ifelse((data$Treatment_Group==3|data$Treatment_Group==4),data$SE5a,data$y3_b)
+data$y3_b<-ifelse((data$Treatment_Group==5|data$Treatment_Group==6),data$SP5a,data$y3_b)
+#`SC4b` (Control)/`SE5b` (Empathy)/`SP5b` (Persuasion) is a variable that asks whether the respondent thinks the US should (not) absolutely admit Refugee 2c, where 1 is NOT and 7 is should. 
+data$y3_c<-data$SC4b
+data$y3_c<-ifelse((data$Treatment_Group==3|data$Treatment_Group==4),data$SE5b,data$y3_c)
+data$y3_c<-ifelse((data$Treatment_Group==5|data$Treatment_Group==6),data$SP5b,data$y3_c)
+
+#Y4
+#`SC5` (Control)/`SE6` (Empathy)/`SP6` (Persuasion) is a variable that asks whether respondent favors/opposes US taking in refugees who pass a government security screening.
+data$y4<-data$SC5
+data$y4<-ifelse(is.na(data$y4)&(data$Treatment_Group==3|data$Treatment_Group==4),data$SE6,data$y4)
+data$y4<-ifelse(is.na(data$y4)&(data$Treatment_Group==5|data$Treatment_Group==6),data$SP6,data$y4)
+  #recode into oppose=0, favor=1
+data$y4[data$y4==2]<-0
+
+#Y6
+#`SC7a` (Control)/`SE8a` (Empathy)/`SP8a` (Persuasion) is a variable that asks if the respondent would be interested in expressing support for the refugees to the next president.
+data$y6<-data$SC7a
+data$y6<-ifelse(is.na(data$y6)&(data$Treatment_Group==3|data$Treatment_Group==4),data$SE8a,data$y6)
+data$y6<-ifelse(is.na(data$y6)&(data$Treatment_Group==5|data$Treatment_Group==6),data$SP8a,data$y6)
+  #recode into oppose=0, favor=1
+data$y6[data$y6==2]<-0
+```
+
+## Pew religion variables
+```{r, echo=FALSE}
+data$religpew1<-data$religpew#original ver
+data$religpew<-as.factor(data$religpew)#pew_religimp importance of religion #1 very important, 4 is not important at all
+```
+
+## Demeaned covariates
+This section de-means covariates we will be using in the regressions in the hypotheses section. These include `sex`, `birthyr`, `birthcountry`, `educ`, `religpew`, `partyid3`, and `ethnocentric1`.
+```{r, echo=FALSE}
+data$sex1<-data$sex #keep original versions of variables
+data$sex<-scale(data$sex)
+data$birthyr1<-data$birthyr
+data$birthyr<-scale(data$birthyr)
+data$educ1<-data$educ
+data$educ<-scale(data$educ)
+data$pew_religimp1<-data$pew_religimp
+data$pew_religimp<-scale(data$pew_religimp)
+#data$partyid3<-scale(data$partyid3)
+data$ethnocentric1_orig<-data$ethnocentric1
+data$ethnocentric1<-scale(data$ethnocentric1)
+data$birthcountry<-as.factor(data$birthcountry)
+```
+
+## Treatment group variables
+```{r, echo=FALSE}
+data$wave<-ifelse(data$Treatment_Group==1|data$Treatment_Group==3|data$Treatment_Group==5,0,1)#wave 0 or wave 1
+data$treatment<-NA
+data$treatment<-data$Treatment_Group
+data$treatment[data$treatment==1|data$treatment==2]<-"Control"
+data$treatment[data$treatment==3|data$treatment==4]<-"Empathy"
+data$treatment[data$treatment==5|data$treatment==6]<-"Persuasion"
+data$Treatment_Group_names<-NA
+data$Treatment_Group_names<-data$Treatment_Group
+data$Treatment_Group_names[data$Treatment_Group_names==1]<-"Control Wave 1"
+data$Treatment_Group_names[data$Treatment_Group_names==2]<-"Control Wave 2"
+data$Treatment_Group_names[data$Treatment_Group_names==3]<-"Empathy Wave 1"
+data$Treatment_Group_names[data$Treatment_Group_names==4]<-"Empathy Wave 2"
+data$Treatment_Group_names[data$Treatment_Group_names==5]<-"Persuasion Wave 1"
+data$Treatment_Group_names[data$Treatment_Group_names==6]<-"Persuasion Wave 2"
+data$Control<-ifelse(data$Treatment_Group==1|data$Treatment_Group==2,1,0)
+data$Empathy<-ifelse(data$Treatment_Group==3|data$Treatment_Group==4,1,0)
+data$Persuasion<-ifelse(data$Treatment_Group==5|data$Treatment_Group==6,1,0)
+#binary variable for in Control/Empathy
+data$ControlEmpathy<-ifelse(data$Control==1|data$Empathy==1,1,0)
+#binary variable for in Control/Persuasion
+data$ControlPersuasion<-ifelse(data$Control==1|data$Persuasion==1,1,0)
+#binary variable for in Empathy/Persuasion
+data$EmpathyPersuasion<-ifelse(data$Empathy==1|data$Persuasion==1,1,0)
+```
+
+## Long version of data
+We create different stacked versions of the data to look at differences in $Y1,\,Y2,\,Y3$ across refugee profile pairs within respondents. We also create subsets of the data with just respondents who received either Control or Persuasion, Control or Empathy treatments, and Empathy or Persuasion treatments. (Note again, here "Persuasion" is the Information treatment.)
+$Y1$ is used in the context of analyzing the choice a respondent in preferring a Muslim profile over a Christian profile when presented with the two, so first we must reduce the data to situations where the respondent is presented with such a pair, when conducting analyses on $Y1$.
+
+```{r, echo=FALSE}
+## Y4/Y6:regular version of data `data`
+ControlEmpathy.data<-data[data$ControlEmpathy==1,]
+ControlEmpathy.data.w1<-subset(ControlEmpathy.data, wave==0)
+ControlEmpathy.data.w2<-subset(ControlEmpathy.data, wave==1)
+ControlPersuasion.data<-data[data$ControlPersuasion==1,]
+ControlPersuasion.data.w1<-subset(ControlPersuasion.data,wave==0)
+ControlPersuasion.data.w2<-subset(ControlPersuasion.data,wave==1)
+Control<-data[data$Control==1,]
+Control.w1<-subset(Control,wave==0)
+Control.w2<-subset(Control,wave==1)
+# EmpathyPersuasion is dataset of Empathy and Persuasion folks
+EmpathyPersuasion.data<-data[data$Empathy==1|data$Persuasion==1,]
+EmpathyPersuasion.data.w1<-subset(EmpathyPersuasion.data,wave==0)
+EmpathyPersuasion.data.w2<-subset(EmpathyPersuasion.data,wave==1)
+## Y1 - comparing pairs of profiles, stack data so each individual has three rows, each row corresponding to a refugee profile pair
+
+## Y1 - comparing pairs of profiles, leading variables caseid, pair, if individual chose the profile
+data <- data[order(data$caseid),] #, data$pair),] 
+nameb=names(data)%in%c("caseid","weight","weight_all","R1a_sex","R2a_sex",
+                       "R1b_sex","R2b_sex", "R1c_sex", "R2c_sex",
+                       "R1a_age","R2a_age","R1b_age","R2b_age", "R1c_age","R2c_age",
+                       "R1a_english","R2a_english","R1b_english","R2b_english","R1c_english","R2c_english",
+                       "R1a_job","R2a_job","R1b_job","R2b_job","R1c_job","R2c_job",
+                       "R1a_muslim","R2a_muslim","R1b_muslim","R2b_muslim","R1c_muslim","R2c_muslim",
+                       "wave","y1_a","y1_b","y1_c","treatment","partyid3_names","gender","birthyr1","race","educ1","ethnocentric2","religpew","survey_neg","immigrant2","Empathy","Persuasion","ControlEmpathy","ControlPersuasion","EmpathyPersuasion")
+temp=data[nameb]
+
+removevar <- names(temp) %in% c("y1_a","y1_b","y1_c")
+a1<-temp[!removevar] #profile pair 1, first profile
+a1$y1<- ifelse(data$y1_a==0,1,0) #if profile 1 was chosen, in pair a
+a1$Rsex<-a1$R1a_sex
+a1$Rage<-a1$R1a_age
+a1$Renglish<-a1$R1a_english
+a1$Rjob<-a1$R1a_job
+a1$Rmuslim<-a1$R1a_muslim
+a1$pair<-rep(0,nrow(a1))#which pair did this outcome come from
+
+a2<-temp[!removevar] #profile pair 1, second profile
+a2$y1<- ifelse(data$y1_a==1,1,0) #if profile 2 was chosen, in pair a
+a2$Rsex<-a2$R2a_sex
+a2$Rage<-a2$R2a_age
+a2$Renglish<-a2$R2a_english
+a2$Rjob<-a2$R2a_job
+a2$Rmuslim<-a2$R2a_muslim
+a2$pair<-rep(0,nrow(a2))#which pair did this outcome come from
+
+b1<-temp[!removevar] #profile pair 2, first profile
+b1$y1<- ifelse(data$y1_b==0,1,0) #if profile 1 was chosen, in pair b
+b1$Rsex<-b1$R1b_sex
+b1$Rage<-b1$R1b_age
+b1$Renglish<-b1$R1b_english
+b1$Rjob<-b1$R1b_job
+b1$Rmuslim<-b1$R1b_muslim
+b1$pair<-rep(1,nrow(b1))#which pair did this outcome come from
+
+b2<-temp[!removevar] #profile pair 2, second profile
+b2$y1<- ifelse(data$y1_b==1,1,0) #if profile 2 was chosen, in pair b
+b2$Rsex<-b2$R2b_sex
+b2$Rage<-b2$R2b_age
+b2$Renglish<-b2$R2b_english
+b2$Rjob<-b2$R2b_job
+b2$Rmuslim<-b2$R2b_muslim
+b2$pair<-rep(1,nrow(b2))#which pair did this outcome come from
+
+
+c1<-temp[!removevar] #profile pair 2, first profile
+c1$y1<- ifelse(data$y1_c==0,1,0) #if profile 1 was chosen, in pair b
+c1$Rsex<-c1$R1c_sex
+c1$Rage<-c1$R1c_age
+c1$Renglish<-c1$R1c_english
+c1$Rjob<-c1$R1c_job
+c1$Rmuslim<-c1$R1c_muslim
+c1$pair<-rep(2,nrow(c1))#which pair did this outcome come from
+
+c2<-temp[!removevar] #profile pair 2, second profile
+c2$y1<- ifelse(data$y1_c==1,1,0) #if profile 2 was chosen, in pair b
+c2$Rsex<-c2$R2c_sex
+c2$Rage<-c2$R2c_age
+c2$Renglish<-c2$R2c_english
+c2$Rjob<-c2$R2c_job
+c2$Rmuslim<-c2$R2c_muslim
+c2$pair<-rep(2,nrow(c2))#which pair did this outcome come from
+temp<-rbind(a1,a2,b1,b2,c1,c2)
+removevar=names(temp)%in%c("R1a_sex","R2a_sex",
+                       "R1b_sex","R2b_sex", "R1c_sex", "R2c_sex",
+                       "R1a_age","R2a_age","R1b_age","R2b_age", "R1c_age","R2c_age",
+                       "R1a_english","R2a_english","R1b_english","R2b_english","R1c_english","R2c_english",
+                       "R1a_job","R2a_job","R1b_job","R2b_job","R1c_job","R2c_job",
+                       "R1a_muslim","R2a_muslim","R1b_muslim","R2b_muslim","R1c_muslim","R2c_muslim")
+temp=temp[!removevar]
+temp=temp[order(temp$caseid,temp$pair),]
+#variable for if the profile came from a pair where it's comparing Christian to Muslim profiles
+temp$muslimvschristian <- c(0, sapply(2:nrow(temp), function(k) temp$Rmuslim[k]+temp$Rmuslim[k-1]))
+#make odd rows the value of even row below it
+odd_indexes<-seq(1,nrow(temp),2)
+even_indexes<-seq(2,nrow(temp),2)
+odd.temp=temp[odd_indexes,]
+even.temp=temp[even_indexes,]
+odd.temp$muslimvschristian=even.temp$muslimvschristian
+temp=rbind(even.temp,odd.temp)
+temp=temp[order(temp$caseid,temp$pair),]
+rm(odd_indexes,even_indexes,odd.temp,even.temp)
+temp$muslimvschristian=ifelse(temp$muslimvschristian==1,1,0)
+data.y1=temp
+rm(temp)
+
+data.y1.w1<-subset(data.y1,wave==0)
+data.y1.w2<-subset(data.y1,wave==1)
+ControlEmpathy.data.y1<-data.y1[data.y1$ControlEmpathy==1,]
+ControlEmpathy.data.y1.w1<-subset(ControlEmpathy.data.y1,wave==0)
+ControlEmpathy.data.y1.w2<-subset(ControlEmpathy.data.y1,wave==1)
+
+ControlPersuasion.data.y1<-data.y1[data.y1$ControlPersuasion==1,]
+ControlPersuasion.data.y1.w1<-subset(ControlPersuasion.data.y1,wave==0)
+ControlPersuasion.data.y1.w2<-subset(ControlPersuasion.data.y1,wave==1)
+
+EmpathyPersuasion.data.y1<-data.y1[data.y1$EmpathyPersuasion==1,]
+EmpathyPersuasion.data.y1.w1<-subset(EmpathyPersuasion.data.y1,wave==0)
+EmpathyPersuasion.data.y1.w2<-subset(EmpathyPersuasion.data.y1,wave==1)
+
+rm(a1,a2,b1,b2,c1,c2)
+
+## Y2/Y3 - ranking each refugee in each conjoint pair (3 conjoint pairs); longest version of data, stacking refugee conjoint pairs (a,b,c) and refugee 1/2
+  #stack the profiles too
+removevar <- names(data) %in% c("y1_a","y1_b","y1_c","y2_a","y2_b","y2_c","y3_a","y3_b","y3_c","y4","y5","y6")
+a<-cbind(data[!removevar],data$y2_a,data$y3_a)
+names(a)[names(a) == 'data$y2_a'] <- 'y2'
+names(a)[names(a) == 'data$y3_a'] <- 'y3'
+a$Rsex<-a$R1a_sex
+a$Rsex_2<-a$R2a_sex
+a$Rage<-a$R1a_age
+a$Rage_2<-a$R2a_age
+a$Renglish<-a$R1a_english
+a$Renglish_2<-a$R2a_english
+a$Rjob<-a$R1a_job
+a$Rjob_2<-a$R2a_job
+a$Rmuslim<-a$R1a_muslim
+a$Rmuslim_2<-a$R2a_muslim
+a$pair<-rep(0,nrow(a))#which pair did this outcome come from
+
+b<-cbind(data[!removevar],data$y2_b,data$y3_b)
+names(b)[names(b) == 'data$y2_b'] <- 'y2'
+names(b)[names(b) == 'data$y3_b'] <- 'y3'
+b$Rsex<-b$R1b_sex
+b$Rsex_2<-b$R2b_sex
+b$Rage<-b$R1b_age
+b$Rage_2<-b$R2b_age
+b$Renglish<-b$R1b_english
+b$Renglish_2<-b$R2b_english
+b$Rjob<-b$R1b_job
+b$Rjob_2<-b$R2b_job
+b$Rmuslim<-b$R1b_muslim
+b$Rmuslim_2<-b$R2b_muslim
+b$pair<-rep(1,nrow(b))#which pair did this outcome come from
+
+c<-cbind(data[!removevar],data$y2_c,data$y3_c)
+names(c)[names(c) == 'data$y2_c'] <- 'y2'
+names(c)[names(c) == 'data$y3_c'] <- 'y3'
+c$Rsex<-c$R1c_sex
+c$Rsex_2<-c$R2c_sex
+c$Rage<-c$R1c_age
+c$Rage_2<-c$R2c_age
+c$Renglish<-c$R1c_english
+c$Renglish_2<-c$R2c_english
+c$Rjob<-c$R1c_job
+c$Rjob_2<-c$R2c_job
+c$Rmuslim<-c$R1c_muslim
+c$Rmuslim_2<-c$R2c_muslim
+c$pair<-rep(2,nrow(c))#which pair did this outcome come from
+
+data.y2y3<-rbind(a,b,c)
+
+ControlEmpathy.data.y2y3<-data.y2y3[data.y2y3$ControlEmpathy==1,]
+ControlEmpathy.data.y2y3.w1<-subset(ControlEmpathy.data.y2y3,wave==0)
+ControlEmpathy.data.y2y3.w2<-subset(ControlEmpathy.data.y2y3,wave==1)
+ControlPersuasion.data.y2y3<-data.y2y3[data.y2y3$ControlPersuasion==1,]
+ControlPersuasion.data.y2y3.w1<-subset(ControlPersuasion.data.y2y3,wave==0)
+ControlPersuasion.data.y2y3.w2<-subset(ControlPersuasion.data.y2y3,wave==1)
+EmpathyPersuasion.data.y2y3<-data.y2y3[data.y2y3$EmpathyPersuasion==1,]
+EmpathyPersuasion.data.y2y3.w1<-subset(EmpathyPersuasion.data.y2y3,wave==0)
+EmpathyPersuasion.data.y2y3.w2<-subset(EmpathyPersuasion.data.y2y3,wave==1)
+
+Control.data.y2y3<-data.y2y3[data.y2y3$Control==1,]
+Control.data.y2y3.w1<-subset(Control.data.y2y3,wave==0)
+Control.data.y2y3.w2<-subset(Control.data.y2y3,wave==1)
+
+rm(a,b,c)
+
+#combine Y2 and Y3 for long
+y2<-subset(data.y2y3, select=-c(y3,Rage_2, Rsex_2,Renglish_2,Rjob_2,Rmuslim_2)) #remove y3 and Rage_2 etc.
+y2$refugee1or2<-rep(0,nrow(y2))
+y3<-subset(data.y2y3, select=-c(y2,Rage, Rsex, Renglish, Rjob, Rmuslim)) #remove y2 and Rage, Renglish etc...
+y3$refugee1or2<-rep(1,nrow(y3))
+names(y3)[names(y3)=='y3']<-'y2'
+names(y3)[names(y3)=='Rage_2']<-'Rage'
+names(y3)[names(y3)=='Renglish_2']<-'Renglish'
+names(y3)[names(y3)=='Rjob_2']<-'Rjob'
+names(y3)[names(y3)=='Rsex_2']<-'Rsex'
+names(y3)[names(y3)=='Rmuslim_2']<-'Rmuslim'
+data.y2<-rbind(y2,y3)
+data.y2$muslim<-NA #create variable for if any muslim profile viewed by respondent
+data.y2$muslim<-ifelse((data.y2$R1a_muslim==1&data.y2$pair==0&data.y2$refugee1or2==0)|#for first pair, first profile, y2
+                    (data.y2$R2a_muslim==1&data.y2$pair==0&data.y2$refugee1or2==0)|#for first pair, second profile, y2
+                    (data.y2$R1b_muslim==1&data.y2$pair==1&data.y2$refugee1or2==0)|#for second pair, first profile, y2
+                    (data.y2$R2b_muslim==1&data.y2$pair==1&data.y2$refugee1or2==0)|#for second pair, second profile, y2
+                    (data.y2$R1c_muslim==1&data.y2$pair==2&data.y2$refugee1or2==0)|#for third pair, first profile, y2
+                    (data.y2$R2c_muslim==1&data.y2$pair==2&data.y2$refugee1or2==0)|#for third pair, second profile, y2
+                      
+                    (data.y2$R1a_muslim==1&data.y2$pair==0&data.y2$refugee1or2==1)|#for first pair, first profile, y3
+                    (data.y2$R2a_muslim==1&data.y2$pair==0&data.y2$refugee1or2==1)|#for first pair, second profile, y3
+                    (data.y2$R1b_muslim==1&data.y2$pair==1&data.y2$refugee1or2==1)|#for second pair, first profile, y3
+                    (data.y2$R2b_muslim==1&data.y2$pair==1&data.y2$refugee1or2==1)|#for second pair, second profile, y3
+                    (data.y2$R1c_muslim==1&data.y2$pair==2&data.y2$refugee1or2==1)|#for third pair, first profile, y3
+                    (data.y2$R2c_muslim==1&data.y2$pair==2&data.y2$refugee1or2==1)#for third pair, second profile, y3  
+                      ,1,0)
+  #combine if Refugee 1 is muslim/if Refugee 2 is muslim for Y2/Y3 respectively
+data.y2.w1<-subset(data.y2,wave==0)
+data.y2.w2<-subset(data.y2,wave==1)
+ControlEmpathy.data.y2<-data.y2[data.y2$ControlEmpathy==1,]
+ControlEmpathy.data.y2.w1<-subset(ControlEmpathy.data.y2,wave==0)
+ControlEmpathy.data.y2.w2<-subset(ControlEmpathy.data.y2,wave==1)
+ControlPersuasion.data.y2<-data.y2[data.y2$ControlPersuasion==1,]
+ControlPersuasion.data.y2.w1<-subset(ControlPersuasion.data.y2,wave==0)
+ControlPersuasion.data.y2.w2<-subset(ControlPersuasion.data.y2,wave==1)
+EmpathyPersuasion.data.y2<-data.y2[data.y2$EmpathyPersuasion==1,]
+EmpathyPersuasion.data.y2.w1<-subset(EmpathyPersuasion.data.y2,wave==0)
+EmpathyPersuasion.data.y2.w2<-subset(EmpathyPersuasion.data.y2,wave==1)
+Control.data.y2<-data.y2[data.y2$Control==1,]
+Control.data.y2.w1<-subset(Control.data.y2,wave==0)
+Control.data.y2.w2<-subset(Control.data.y2,wave==1)
+Empathy.data.y2<-data.y2[data.y2$Empathy==1,]
+Empathy.data.y2.w1<-subset(Empathy.data.y2,wave==0)
+Empathy.data.y2.w2<-subset(Empathy.data.y2,wave==1)
+Persuasion.data.y2<-data.y2[data.y2$Persuasion==1,]
+Persuasion.data.y2.w1<-subset(Persuasion.data.y2,wave==0)
+Persuasion.data.y2.w2<-subset(Persuasion.data.y2,wave==1)
+```
+Save the cleaned data.
+```{r}
+save.image("cleandata.RData")
+```
+This is the end of the pre-analysis data prep.
+
+# PAP Analysis
+This section conducts the hypothesis tests specified in the Adida, Lo, Platas preanalysis plan.
+
+We can start here with `cleandata.RData` if we like. Control variables include: gender, age, US born, education level, religion, party ID, and ethnocentrism as specified in our PAP.
+
+```{r}
+rm(list=ls())
+load("cleandata.RData")
+#function for ols, calculating regression outputs with possibility for robust, clustered, robust-clustered standard errors.
+#from Mahmood Arai
+clx <-function(fm, cluster=NULL){
+  if(length(cluster)!=0){
+    M <- length(unique(cluster))
+    dfcw <- fm$df / (fm$df - (M -1))
+    N <- length(cluster)
+    dfc <- (M/(M-1))*((N-1)/(N-fm$rank))
+    u <- apply(estfun(fm),2,
+               function(x) tapply(x, cluster, sum))
+    vcovCL <- dfc*sandwich(fm, meat=crossprod(u)/N)*dfcw
+    coeftest(fm, vcovCL) }
+  else{
+    vcovR<-vcovHC(fm,sandwich=TRUE,type="HC")#heteroskedastic consistent cov matrix estimation, with White's estimator
+    coeftest(fm,vcovR)
+  }
+}
+#mahmood arai - just cluster
+cl   <- function(fm, dat,cluster){
+  require(sandwich, quietly = TRUE)
+  require(lmtest, quietly = TRUE)
+  M <- length(unique(cluster))
+  N <- length(cluster)
+  K <- fm$rank
+  dfc <- (M/(M-1))*((N-1)/(N-K))
+  uj  <- apply(estfun(fm),2, function(x) tapply(x, cluster, sum));
+  vcovCL <- dfc*sandwich(fm, meat=crossprod(uj)/N)
+  coeftest(fm, vcovCL) }
+```
+
+## Primary hypotheses: H1a - H4b
+### H1a: 
+Respondents who receive the empathy prime will give higher admission scores (7 point scale) than those in the control group.
+```{r, echo=FALSE}
+h1a<-lm(y2 ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.y2.w1)
+clx(h1a, ControlEmpathy.data.y2.w1$caseid)
+#with weights
+h1a<-lm(y2 ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.y2.w1, weights= weight_all)
+clx(h1a, ControlEmpathy.data.y2.w1$caseid)
+```
+
+No statistically significant effect of Empathy on Y2.
+
+### H1b: 
+Respondents who receive the persuasion prime will give higher admission scores (7 point scale) than those in the control group.
+
+```{r, echo=FALSE}
+h1b<-lm(y2 ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+ immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.y2.w1)
+clx(h1b,ControlPersuasion.data.y2.w1$caseid)
+#with weights
+h1b<-lm(y2 ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+ immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.y2.w1,weights=weight_all)
+clx(h1b,ControlPersuasion.data.y2.w1$caseid)
+```
+No statistically significant effect of persuasion on Y2; with weights however there is a slightly negative of persuasion on Y2: -0.531909, with pvalue=0.0705171. This doesn't pass the Bonferonni multiple comparisons test (which requires passing 0.05/8=0.00625 pvalue).
+
+### H2a: (Empathy effect: letter) 
+Respondents receiving the empathy prime will be more likely than those in the control group to send an anonymous letter to the next President of the U.S. in support of resettling refugees.
+```{r,echo=FALSE}
+h2a<-lm(Y6_new ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.w1)
+clx(h2a)
+#with weights
+h2a<-lm(Y6_new ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.w1, weights=weight_all)
+clx(h2a)
+```
+Empathy effect without weights: 0.1861761, pvalue=0.0001524. This passes the Bonferonni multiple hypothesis corrections pvalue of 0.00625.
+
+### H2b: (Persuasion effect: letter) 
+
+Respondents receiving the persuasion prime will be more likely than those in the control group to send an anonymous letter to the next President of the U.S. in support of resettling refugees.
+
+```{r,echo=FALSE}
+h2b<-lm( Y6_new ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+ immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.w1)
+clx(h2b)
+#with weights
+h2b<-lm( Y6_new ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+ immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.w1, weights=weight_all)
+clx(h2b)
+```
+No statistically significant effect of persuasion on Y6.
+
+### H3a: (Long term empathy effect: score) 
+The empathy prime effect on improving scores given to refugee profiles may degrade over time, but will persist.
+We use the `ControlEmpathy.data.y2` dataset, restricted to only individuals who answered the dependent variable questions in Wave 2 (`Treatment_Group==2` or `Treatment_Group==4`).
+```{r,echo=FALSE}
+h3a<-lm(y2 ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Persuasion*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.y2.w2)
+clx(h3a, ControlEmpathy.data.y2.w2$caseid)
+#with weights
+h3a<-lm(y2 ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Persuasion*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.y2.w2, weights=weight_all)
+clx(h3a, ControlEmpathy.data.y2.w2$caseid)
+```
+No long-term empathy effect on Y2.
+
+### H3b: (Long term persuasion effect: score) 
+The persuasion effect on improving scores given to refugee profiles may degrade over time, but will persist. 
+We use the `ControlPersuasion.data.y2` dataset, restricted to only individuals who answered the dependent variable questions in Wave 2 (`Treatment_Group==2` or `Treatment_Group==6`).
+```{r,echo=FALSE}
+h3b<-lm(y2 ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+ immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.y2.w2)
+clx(h3b, ControlPersuasion.data.y2.w2$caseid) #corrected for robust-cluster se.
+#with weights
+h3b<-lm(y2 ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+ immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.y2.w2, weights=weight_all)
+clx(h3b, ControlPersuasion.data.y2.w2$caseid)
+```
+No longterm persuasion effect on Y2.
+
+### H4a: (Long term empathy effect: letter) 
+The empathy prime effect on sending an anonymous letter to the next President of the U.S. in support of resettling refugees may degrade over time, but will persist. 
+We use the `ControlEmpathy.data` dataset, restricted to only individuals who answered the dependent variable questions in Wave 2 (`Treatment_Group==2` or `Treatment_Group==4`).
+
+```{r,echo=FALSE}
+ControlEmpathy.data.w2<-subset(ControlEmpathy.data,wave==1)
+h4a<-lm(Y6_new ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Persuasion*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.w2)
+clx(h4a)
+#with weights
+h4a<-lm(Y6_new ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Persuasion*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.w2, weights=weight_all)
+clx(h4a)
+```
+No long-term empathy effect on Y6.
+
+### H4b: (Long term persuasion effect: letter) 
+The persuasion effect on sending an anonymous letter to the next President of the U.S. in support of resettling refugees may degrade over time, but will persist.
+We use the `ControlPersuasion.data` dataset, restricted to only individuals who answered the dependent variable questions in Wave 2 (`Treatment_Group==2` or `Treatment_Group==6`).
+```{r,echo=FALSE}
+ControlPersuasion.data.w2<-subset(ControlEmpathy.data,wave=1)
+h4b<-lm(Y6_new ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+ immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.w2)
+clx(h4b)
+#with weights
+h4b<-lm(Y6_new ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+ immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.w2, weights=weight_all)
+clx(h4b)
+```
+No long-term persuasion effect on Y6.
+
+## Secondary hypotheses: H5a - H6b
+### H5a: (Heterogeneous effect of empathy and Muslim: score) 
+The empathy prime interacted with a Muslim refugee profile will lead to higher admission scores on average than no treatment interacted with Muslim refugee profiles. We use the `ControlEmpathy.data.y2` dataset, for wave 1.
+```{r,echo=FALSE}
+h5a<-lm(y2 ~ Empathy+muslim+Empathy*muslim+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Persuasion*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.y2.w1)
+clx(h5a, ControlEmpathy.data.y2.w1$caseid) 
+```
+No statistically significant effect of Empathy:muslim on Y2.
+
+### H5b: (Heterogeneous effect of persuasion and Muslim: score) 
+The persuasion treatment will improve scores for Muslim refugee profiles and will be correlated with higher admission scores than Muslim refugee profiles in the control. We use the `ControlPersuasion.data.y2` dataset, for wave 1.
+
+```{r,echo=FALSE}
+h5b<-lm(y2 ~ Persuasion+muslim+Persuasion*muslim+sex+Persuasion*sex+birthyr+Persuasion*birthyr+ immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.y2.w1)
+clx(h5b, ControlPersuasion.data.y2.w1$caseid)
+```
+No statistically significant effect of Persuasion:muslim on Y2.
+
+### H6a: (Heterogeneous effect of empathy and Muslim: letter) 
+The empathy prime combined with seeing Muslim refugee profiles will be correlated with a higher likelihood of sending an anonymous letter to the next President of the U.S. in support of resettling refugees,controlling for the number of Muslim refugee profiles seen. We use the `ControlEmpathy.data` dataset using the variable `num_muslims` for number of Muslim refugee profiles seen, for wave 1.
+
+```{r,echo=FALSE}
+h6a<-lm(Y6_new ~ Empathy+num_muslim+Empathy*num_muslim+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Persuasion*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.w1)
+clx(h6a)
+```
+
+No statistically significant effect of Empathy:num_muslim on Y6.
+
+### H6b: (Heterogeneous effect of persuasion and Muslim: letter) 
+The persuasion prime com- bined with seeing Muslim refugee profiles will be correlated with a higher likelihood of sending an anonymous letter to the next President of the U.S. in support of resettling refugees, controlling for the number of Muslim refugee profiles seen. We use the `ControlPersuasion.data` dataset using the variable `num_muslims` for number of Muslim refugee profiles seen, for wave 1.
+
+```{r,echo=FALSE}
+h6b<-lm(Y6_new ~ Persuasion+num_muslim+Persuasion*num_muslim+sex+Persuasion*sex+birthyr+Persuasion*birthyr+immigrant2+Persuasion*immigrant2+educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlPersuasion.data.w1)
+clx(h6b)
+```
+No statistically significant effect of Persuasion:num_muslim on Y6.
+
+## Additional hypotheses: robustness checks and verifications: H7a - H15c
+### H7a: (Y1)
+Given a choice between choosing a Christian refugee profile versus a Muslim refugee profile, respondents are on average more likely to prefer the Christian refugee profile.
+We first subset the data `data.y1` to profile pairs where a Christian profile is compared against a Muslim profile (`h7a`) and use only observations from the Control group.
+```{r,echo=FALSE}
+#choose profile
+h7a.data=subset(data.y1,treatment=="Control")
+h7a<-lm(y1~Rmuslim,data=h7a.data)
+clx(h7a,h7a.data$caseid)
+
+h7a<-lm(y1~Rmuslim+gender+birthyr1+immigrant2+educ1+religpew+partyid3_names+ethnocentric2,data=h7a.data)
+clx(h7a,h7a.data$caseid)
+```
+There exists a Muslim penalty -- respondents in the Control group are less likely (-0.0740753) to choose a profile if it is Muslim than if it is Christian.
+
+### H7b: 
+Respondents will give lower admission scores on average to Muslim refugees relative to Christian refugees (“Muslim penalty”). We consider only the Control group, for wave 1.
+
+```{r,echo=FALSE}
+h7b.data<-data.y2
+h7b.data.w1<-subset(h7b.data,wave==0)
+h7b<-lm(y2 ~ muslim + sex + muslim*sex + birthyr + muslim*birthyr+ educ + muslim*educ + religpew + muslim*religpew + partyid3_names + muslim*partyid3_names + ethnocentric1 + muslim*ethnocentric1 + immigrant2 + muslim*immigrant2,data=h7b.data.w1)
+clx(h7b,h7b.data.w1$caseid)
+```
+We see that there is a highly significant and negative muslim effect (-0.33,pvalue=0.007275; does not pass Bonferonni correction of 0.05/11=0.004545455). Respondents are more likely to give higher scores to Christian refugees compared to Muslim ones.
+
+### H7c: 
+The likelihood of respondents sending an anonymous letter to the White House is negatively correlated with the number of Muslim refugee profiles presented to them. (`data`, using explanatory variable `num_muslim`, wave 1).
+```{r,echo=FALSE}
+data.w1<-subset(data,wave==0)
+h7c<-lm(Y6_new ~ num_muslim + sex + num_muslim*sex + birthyr + num_muslim*birthyr + educ + num_muslim*educ + religpew + num_muslim*religpew + partyid3_names + num_muslim*partyid3_names + ethnocentric1 + num_muslim*ethnocentric1 + family_income + num_muslim*family_income +immigrant2 + num_muslim*immigrant2,data=data.w1)
+clx(h7c)
+```
+No statistically significant effect of num_muslim on Y6.
+
+
+### H8a: HTE empathy with Muslim profile on Y2 over time
+The heterogeneous effect of the empathy treatment with the ratings of a Muslim refugee profile compared to a Christian refugee profile may degrade in magnitude over time but will persist. We subset `h7b` to only respondents who answered dependent variable questions in Wave 2 (`Treatment_Group==2` and `Treatment_Group==4`) and call this `h8a`.
+```{r,echo=FALSE}
+h8a.data<-subset(h7b.data,wave==1)
+h8a<-lm(y2 ~ Empathy+muslim+Empathy*muslim+sex+Empathy*sex+birthyr+Empathy*birthyr+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1 + family_income+Empathy*family_income+immigrant2+Empathy*immigrant2,data=h8a.data)
+clx(h8a,h8a.data$caseid)
+```
+No statistically significant effect of Empathy:muslim on Y2 in long-run.
+
+### H8b: HTE information with Muslim profile on Y2 over time
+The heterogeneous effect of the persuasion treatment with the ratings of a Muslim refugee profile compared to a Christian refugee profile may degrade in magnitude over time but will persist. We subset `h7b` to only respondents who answered dependent variable questions in Wave 2 (`Treatment_Group==2` and `Treatment_Group==6`) and call this `h8b`.
+
+```{r,echo=FALSE}
+h8b.data<-subset(h7b.data,wave==1)
+h8b<-lm(y2 ~ Persuasion+muslim+Persuasion*muslim+sex+Persuasion*sex+birthyr+Persuasion*birthyr+educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1 + family_income+Persuasion*family_income+immigrant2+Persuasion*immigrant2,data=h8b.data)
+clx(h8b,h8b.data$caseid)
+```
+No statistically significant effect of Persuasion:muslim on Y2 in long-run.
+
+### H9a: HTE empathy with Muslim profile on Y6 over time
+The heterogeneous effect of the empathy treatment with seeing Muslim refugee profiles on sending an anonymous letter to the White House may degrade in magnitude over time but will persist. We use `ControlEmpathy.data.w2`.
+```{r,echo=FALSE}
+h9a<-lm(Y6_new ~ Empathy+num_muslim+Empathy*num_muslim+sex+Empathy*sex+birthyr+Empathy*birthyr+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1 + family_income+Empathy*family_income+immigrant2+Empathy*immigrant2,data=ControlEmpathy.data.w2)
+clx(h9a)
+```
+No statistically significant effect of Empathy:num_muslim on Y6 over time.
+### H9b: HTE information with Muslim number on Y6 over time
+The heterogeneous effect of the persuasion treatment with seeing Muslim refugee profiles on sending an anonymous letter to the White House may degrade in magnitude over time but will persist. We use `ControlPersuasion.data.w2`.
+```{r,echo=FALSE}
+h9b<-lm(Y6_new ~ Persuasion+num_muslim+Persuasion*num_muslim+sex+Persuasion*sex+birthyr+Persuasion*birthyr+educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1 + family_income+Persuasion*family_income+immigrant2+Persuasion*immigrant2,data=ControlPersuasion.data.w2)
+clx(h9b)
+```
+No statistical significant effect of Persuasion:num_muslim on Y6.
+
+### H10a: (Heterogeneous effect of empathy and Muslim: screening) 
+The empathy prime combined with seeing Muslim refugee profiles will be correlated with a higher likelihood of favoring the U.S. taking in Syrian refugees who pass a government security screening relative to the control, controlling for the number of Muslim refugee profiles seen. We use `ControlEmpathy.data` for wave 1, `ControlEmpathy.data.w1`.
+
+```{r,echo=FALSE}
+h10a<-lm(y4 ~ Empathy+num_muslim+Empathy*num_muslim + sex + Empathy*sex + birthyr + Empathy*birthyr + immigrant2 + Empathy*immigrant2 + educ + Empathy*educ + religpew + Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.w1)
+clx(h10a)
+```
+No statistically significant effect of Empathy:num_muslim on Y4.
+
+
+### H10b: (Heterogeneous effect of persuasion and Muslim: screening) 
+The persuasion prime combined with seeing Muslim refugees profile will be correlated with a higher likelihood of favoring the U.S. taking in Syrian refugees who pass a government security screening than in the control, controlling for the number of Muslim refugee profiles seen.We use `ControlPersuasion.data.w1`.
+
+```{r,echo=FALSE}
+h10b<-lm(y4 ~ Persuasion+num_muslim+Persuasion*num_muslim + sex + Persuasion*sex + birthyr + Persuasion*birthyr + immigrant2 + Persuasion*immigrant2 + educ + Persuasion*educ + religpew + Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.w1)
+clx(h10b)
+```
+No statistically significant effect of Persuasion:num_muslim on Y4.
+
+### H11a: (Heterogeneous empathy and muslim effect: screening over time)
+The heterogeneous effect of the empathy treatment and seeing Muslim refugee profiles (compared to a Christian refugee profile) on favoring the U.S. taking in Syrian refugees who pass a government security screening may degrade in magnitude over time but will persist. We use `ControlEmpathy.data.w2`.
+```{r,echo=FALSE}
+h11a<-lm(y4 ~Empathy+num_muslim+Empathy*num_muslim + sex + Empathy*sex + birthyr + Empathy*birthyr + immigrant2 + Empathy*immigrant2 + educ + Empathy*educ + religpew + Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.w2)
+clx(h11a)
+```
+No statistically significant effect of Empathy:num_muslim on Y4.
+
+### H11b: (Heterogeneous persuasion and muslim effect: screening over time)
+The heterogeneous effect of the persuasion treatment with and seeing a Muslim refugee profile compared to a Christian refugee profile on the likelihood of favoring the U.S. taking in Syrian refugees who pass a government security screening may degrade in magnitude over time but will persist. We use `ControlPersuasion.data.w2`.
+```{r,echo=FALSE}
+h11b<-lm(y4 ~ Persuasion+num_muslim+Persuasion*num_muslim + sex + Persuasion*sex + birthyr + Persuasion*birthyr + immigrant2 + Persuasion*immigrant2 + educ + Persuasion*educ + religpew + Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.w2)
+clx(h11b)
+```
+No statistically significant effect of Persuasion:num_muslim on Y4.
+
+As indicated in our preanalysis plan, as a robustness check for our primary outcome $Y2$, we check whether the empathy and persuasion treatments have similar positive effects on outcome $Y4$ that should reasonably have some correlations with $Y2$. We also look at whether there is an overall reduction in discrimination on any basis in refugee pair profiles (reported differences in scores assigned to $Y2$ and $Y3$).
+
+### H12a: (Empathy effect on screening)
+The empathy prime will significantly increase the respondent’s reported inclusionary attitude for the U.S. taking in Syrian refugees who pass a government security screening. We use `ControlEmpathy.data.w1`.
+```{r,echo=FALSE}
+h12a<-lm(y4 ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.w1)
+clx(h12a)
+```
+
+There is a small positive, empathy effect (coefficient=0.010352) on likelihood of being in favor of taking in Syrian refugees who pass screening, though this is at a pvalue of 0.0638717.
+
+### H12b: (Persuasion effect on screening)
+The persuasion treatment will significantly increase the respondent’s reported inclusionary attitude for the U.S. taking in Syrian refugees who pass a government security screening. We use `ControlPersuasion.data.w1`.
+```{r,echo=FALSE}
+h12b<-lm(y4 ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+immigrant2+Persuasion*immigrant2+educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.w1)
+clx(h12b)
+```
+There is no statistically significant effect of persuasion on screening (Y4).
+
+### H13a: (Empathy effect on difference in scores of refugee pair)
+The empathy prime will significantly decrease the magnitude of the average difference in admission scores across refugee pairs (i.e. reduce discrimination on any basis). We use `ControlEmpathy.data.y2y3` and create a variable `diffy2y3` that is the absolute difference between the respondent's reported score for $Y2$ and for $Y3$ in wave 1.
+```{r,echo=FALSE}
+ControlEmpathy.data.y2y3$diffy2y3<-abs(ControlEmpathy.data.y2y3$y2-ControlEmpathy.data.y2y3$y3)
+ControlEmpathy.data.y2y3.w1$diffy2y3<-abs(ControlEmpathy.data.y2y3.w1$y2-ControlEmpathy.data.y2y3.w1$y3)
+h13a<-lm(diffy2y3~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,ControlEmpathy.data.y2y3.w1)
+clx(h13a,ControlEmpathy.data.y2y3.w1$caseid)
+```
+No statistically significant effect on Empathy (vs Persuasion).
+### H13b: (Persuasion effect on difference in scores of refugee pair)
+The persuasion treatment will significantly decrease the magnitude of the average difference in admission scores across refugee pairs (i.e. reduce discrimination on any basis). We use `ControlPersuasion.data.y2y3` and create a variable `diffy2y3` that is the absolute difference between the respondent's reported score for $Y2$ and for $Y3$ in wave 1.
+```{r,echo=FALSE}
+ControlPersuasion.data.y2y3.w1$diffy2y3<-abs(ControlPersuasion.data.y2y3.w1$y2-ControlPersuasion.data.y2y3.w1$y3)
+h13b<-lm(diffy2y3~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+immigrant2+Persuasion*immigrant2+educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,ControlPersuasion.data.y2y3.w1)
+clx(h13b,ControlPersuasion.data.y2y3.w1$caseid)
+```
+No statistically significant effect of Persuasion on difference in scores.
+
+### H14a: (Difference between Empathy and Persuasion for refugee scores)
+Respondents who receive the empathy prime will have significantly different point scores reported for refugee profiles than those in the persuasion group. We use `EmpathyPersuasion.data.y2.w1`.
+```{r,echo=FALSE}
+h14a<-lm(y2~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=EmpathyPersuasion.data.y2.w1)
+clx(h14a,EmpathyPersuasion.data.y2.w1$caseid)
+```
+No statistically significant effect of Empathy (vs Persuasion) on difference in refugee scores.
+
+### H14b: (Difference between Empathy and Persuasion for accepting refugees who pass security screening)
+Respondents who receive the empathy prime will have a significantly different preference for the U.S. taking in Syrian refugees who pass a government security screening than respondents in the persuasion group. We use `EmpathyPersuasion.data.w1`.
+```{r,echo=FALSE}
+h14b<-lm(y4~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=EmpathyPersuasion.data.w1)
+clx(h14b)
+```
+No statistically significant difference between Empathy/Persuasion effects on screening (Y4).
+
+### H14c: (Difference between Empathy and Persuasion for writing a letter)
+The empathy prime group will have a significantly different preference compared to the persuasion group toward sending an anonymous letter to the White House. We use `EmpathyPersuasion.data.w1`.
+```{r,echo=FALSE}
+h14c<-lm(Y6_new~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=EmpathyPersuasion.data.w1)
+clx(h14c)
+```
+There is a statistically significant effect of Empathy (vs persuasion) on Y6: estimate is 0.1298184, pvalue=0.0085180 (passes Bonferonni correction: 0.05/6=0.008333333). 
+
+### H15a: (Difference between Empathy and Persuasion in long term on assigning refugee scores)
+The effects of the empathy treatment on assigning higher point scores to refugee profiles will degrade significantly differently than the persuasion treatment over time.
+We use the `EmpathyPersuasion.data.y2.w2` dataset, restricted to only individuals who answered the dependent variable questions in Wave 2.
+```{r,echo=FALSE}
+h15a<-lm(y2~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=EmpathyPersuasion.data.y2.w2)
+clx(h15a,EmpathyPersuasion.data.y2.w2$caseid)
+```
+No statistically significant effect.
+
+### H15b: (Difference between Empathy and Persuasion in long term for accepting refugees who pass security screening)
+The effects of the empathy treatment on favoring or opposing the U.S. taking in Syrian refugees will degrade significantly differently than the persuasion treatment over time. We use the `EmpathyPersuasion.data.w2` dataset, restricted to only individuals who answered the dependent variable questions in Wave 2.
+```{r,echo=FALSE}
+h15b<-lm(y4~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=EmpathyPersuasion.data.w2)
+clx(h15b)
+```
+No statistically significant difference between Empathy/Persuasion effects on screening (Y4) in long term.
+
+### H15c: (Difference between Empathy and Persuasion in long term for writing a letter)
+The effects of the empathy treatment on sending an anonymous letter to the White House will degrade significantly differently than the persuasion treatment over time. We use the `EmpathyPersuasion.data.w2` dataset, restricted to only individuals who answered the dependent variable questions in Wave 2.
+```{r,echo=FALSE}
+h15c<-lm(Y6_new~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=EmpathyPersuasion.data.w2)
+summary(h15c)
+```
+No statistically significant effect of Empathy on Y6 in long term.
+
+End of PAP analysis.
+
+
+
+
+
+# Analysis outside of PAP
+
+## Summary statistics
+### % of overall sample, of dems, of reps and of indeps who wrote a positive letter in control and then in each condition. 
+```{r}
+prop.table(table(data$partyid3_names,data$Y6_new, data$treatment))
+```
+Looking at just the Control group, baseline $Y6,Y2,Y1$ values by party:
+```{r}
+#Y6
+t.test(data.w1$Y6_new[data.w1$partyid3_names=="Democrat"&data.w1$Treatment_Group_names=="Control Wave 1"])
+t.test(data.w1$Y6_new[data.w1$partyid3_names=="Republican"&data.w1$Treatment_Group_names=="Control Wave 1"])
+t.test(data.w1$Y6_new[data.w1$partyid3_names=="Independent"&data.w1$Treatment_Group_names=="Control Wave 1"])
+
+#Y2
+t.test(data.y2.w1$y2[data.y2.w1$partyid3_names=="Democrat"&data.y2.w1$Treatment_Group_names=="Control Wave 1"])
+t.test(data.y2.w1$y2[data.y2.w1$partyid3_names=="Republican"&data.y2.w1$Treatment_Group_names=="Control Wave 1"])
+t.test(data.y2.w1$y2[data.y2.w1$partyid3_names=="Independent"&data.y2.w1$Treatment_Group_names=="Control Wave 1"])
+```
+
+Subsection in paper on magnitudes under ``Information'': For example, Republicans exposed to the information treatment held significantly more negative favorability ratings of refugees than Republicans in our control condition. The magnitude of the effect is larger than that of our empathy treatment
+```{r}
+t.test(y2~Persuasion, 
+       data=ControlPersuasion.data.y2.w1[ControlPersuasion.data.y2.w1$partyid3_names=="Republican",])
+
+t.test(y2~Empathy, 
+       data=ControlEmpathy.data.y2.w1[ControlEmpathy.data.y2.w1$partyid3_names=="Republican",])
+```
+
+### Magnitudes of effects, taking a closer look.
+
+The results of the experiment demonstrate that Empathy can move Democrats towards writing more letters. We take a closer look at letter writing behavior in the Control groups for each of the parties.
+
+```{r}
+table(data$treatment,data$Y6_new,data$partyid3_names)
+```
+Democrats are at a baseline 29.3% willing to write positive letters in the Control group. They're 33.4% willing to write positive letters in the Empathy group.
+Independents are at a baseline 19.5% willing to write positive letters in the Control group. They're 20.7% willing to write positive letters in the Empathy group.
+Republicans are at a baseline 5.5% willing to write positive letters in the Control group. They're 6.5% willing to write positive letters in the Empathy group.
+
+Now just letter writing in general:
+
+Democrats are at a baseline 29.3% willing to write letters in the Control group. They're 33.4% willing to write letters in the Empathy group. (same as above)
+Independents are at a baseline 19.5% willing to write letters in the Control group. They're 20.7% willing to write letters in the Empathy group. (same as above)
+Republicans are at a baseline 5.5% willing to write letters in the Control group. They're 6.5% willing to write letters in the Empathy group.
+
+### Specific notes for text:
+Abstract: t-test effect of Empathy for Empathy-Control on Y6
+```{r}
+t.test(Y6_new~Empathy, data=ControlEmpathy.data.w1)
+```
+
+Proportion of people in control who wrote positive letter
+```{r}
+table(data$treatment,data$Y6_new)
+339/(1461+339)
+#for just wave 1
+table(data.w1$treatment,data.w1$Y6_new)
+151/(151+749)
+```
+
+Proportion of people in Empathy group who wrote positive letter
+```{r}
+table(data$treatment,data$Y6_new)
+374/(374+1426)
+#for just wave 1
+table(data.w1$treatment,data.w1$Y6_new)
+192/(192+708)
+```
+
+
+## Backlash: Persuasion might have a backlash effect on republicans
+
+First let's take a look at some t.tests to double check whether there's a backlash effect with the Empathy/Persuasion treatments amongst certain party identities. The backlash variable is `survey_neg`. 
+First, let's take a look at Empathy:
+```{r Empathy-backlash?}
+#ttests
+t.test(survey_neg~treatment, ControlEmpathy.data.w1[ControlEmpathy.data.w1$partyid3_names=="Democrat",],conf.level=0.95)
+t.test(survey_neg~treatment, ControlEmpathy.data.w1[ControlEmpathy.data.w1$partyid3_names=="Republican",],conf.level=0.95)
+t.test(survey_neg~treatment, ControlEmpathy.data.w1[ControlEmpathy.data.w1$partyid3_names=="Independent",],conf.level=0.95)
+
+## full PAP specified-esque regressions
+back1 <- lm(survey_neg~Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1, ControlEmpathy.data.w1)
+clx(back1)
+  #with weights
+  back1 <- lm(survey_neg~Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1, ControlEmpathy.data.w1, weights=weight_all)
+  clx(back1)
+  #no change, no effect
+```
+No backlash effect.
+
+Now let's take a look at Persuasion:
+```{r Persuasion-backlash?}
+#ttests
+t.test(survey_neg~treatment, ControlPersuasion.data.w1[ControlPersuasion.data.w1$partyid3_names=="Democrat",],conf.level=0.95)
+t.test(survey_neg~treatment, ControlPersuasion.data.w1[ControlPersuasion.data.w1$partyid3_names=="Republican",],conf.level=0.95)
+t.test(survey_neg~treatment, ControlPersuasion.data.w1[ControlPersuasion.data.w1$partyid3_names=="Independent",],conf.level=0.95)
+
+## full PAP specified-esque regressions
+back2 <- lm(survey_neg~Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+immigrant2+Persuasion*immigrant2+educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1, ControlPersuasion.data.w1)
+clx(back2)
+  #with weights
+  back2 <- lm(survey_neg~Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+immigrant2+Persuasion*immigrant2+educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1, ControlPersuasion.data.w1, weights=weight_all)
+  clx(back2)
+```
+There is an interaction effect of Persuasion:partyid3_namesRepublican on backlash: 0.08342673 (pvalue=0.01510).
+
+### Full regression on backlash (with triple interaction on treatment, partyid, wave)
+
+```{r}
+#Empathy
+back7<-lm(survey_neg~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1 + wave + Empathy*wave + Empathy*wave*partyid3_names,data=ControlEmpathy.data)
+clx(back7)
+#Persuasion
+back8<- lm(survey_neg ~ Persuasion + sex + Persuasion*sex + birthyr + Persuasion*birthyr + immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1 + wave + Persuasion*wave + Persuasion*wave*partyid3_names,data=ControlPersuasion.data)
+clx(back8)
+```
+
+
+## Time effects: Further analysis into Wave 2
+
+From H4a and H4b we know that the empathy and persuasion effects do not persist for $Y6$. 
+
+From H8a and H8b we know that the Empathy-muslim and Persuasion-muslim interaction effects do not persist for $Y2$. From H9a and H9b we know that the heterogeneous effect of empathy/persuasion with seeing Muslim refugee profiles on $Y6$ do not persist.
+
+From H11a and H11b we know that the heterogeneous effect of the Empathy/persuasion treatments with seeing Muslim refugee profiles on $Y4$ do not persist.
+
+For full look at Wave 2 on Y1, Y2, Y6 for Empathy and Persuasion treatment effects:
+```{r}
+#Empathy
+  #Y1
+te1<-lm(y1 ~Empathy+gender+Empathy*gender+birthyr1+Empathy*birthyr1+immigrant2+Empathy*immigrant2+educ1+Empathy*educ1+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric2 + Empathy*ethnocentric2,data=ControlEmpathy.data.y1.w2)
+clx(te1, cluster=ControlEmpathy.data.y1.w2$caseid) 
+```
+There is an empathy effect in wave 2 on Y1: estimate is 2.6264e-11, pvalue=< 2.2e-16 ***.
+```{r}
+  #Y2
+te2<-lm(y2 ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.y2.w2)
+clx(te2, cluster=ControlEmpathy.data.y2.w2$caseid) 
+```
+No empathy effect in wave 2 on Y2.
+```{r}
+  #Y6
+te3<-lm(Y6_new ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1,data=ControlEmpathy.data.w2)
+clx(te3)
+```
+No empathy effect in wave 2 on Y6.
+
+```{r}
+#Persuasion
+  #Y1
+pe1<-lm(y1 ~ Persuasion+gender+Persuasion*gender+birthyr1+Persuasion*birthyr1+immigrant2+Persuasion*immigrant2+educ1+Persuasion*educ1+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric2 + Persuasion*ethnocentric2,data=ControlPersuasion.data.y1.w2)
+clx(pe1, cluster=ControlPersuasion.data.y1.w2$caseid) 
+```
+There is a negative statistically significant effect of persuasion on Y1 in wave 2: estimate -2.9640e-12, pvalue=< 2.2e-16 ***.
+```{r}
+  #Y2
+pe2<-lm(y2 ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+immigrant2+Persuasion*immigrant2+educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.y2.w2)
+clx(pe2, cluster=ControlPersuasion.data.y2.w2$caseid) 
+```
+No statistically significant effect of persuasion on y2 in wave2.
+```{r}
+  #Y6
+pe3<-lm(Y6_new ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+immigrant2+Persuasion*immigrant2+educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1,data=ControlPersuasion.data.w2)
+clx(pe3)
+```
+No statistically significant effect of persuasion on y6 in wave2.
+Further visual analysis conducted in graphs/plots section.
+### What happens in Wave 2 for HTE on Party?
+
+```{r}
+###### Y6
+#H2a in Wave 2
+party.time1<-lm(Y6_new ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1 + wave + Empathy*wave + wave*partyid3_names+Empathy*wave*partyid3_names,data=ControlEmpathy.data)
+clx(party.time1)
+
+#H2b in Wave 2
+party.time2 <- lm( Y6_new ~ Persuasion + sex + Persuasion*sex + birthyr + Persuasion*birthyr + immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1 + wave + Persuasion*wave + wave*partyid3_names+ Persuasion*wave*partyid3_names,data=ControlPersuasion.data)
+clx(party.time2)
+
+###### Y2
+party.time3 <- lm(y2 ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1 + wave + Empathy*wave + wave*partyid3_names+Empathy*wave*partyid3_names,data=ControlEmpathy.data.y2)
+clx(party.time3,ControlEmpathy.data.y2$caseid)
+
+party.time4 <- lm(y2 ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+ immigrant2 + Persuasion*immigrant2 + educ+Persuasion*educ+religpew+Persuasion*religpew + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1 + wave + Persuasion*wave+ wave*partyid3_names + Persuasion*wave*partyid3_names,data=ControlPersuasion.data.y2)
+clx(party.time4,ControlPersuasion.data.y2$caseid)
+```
+
+
+
