@@ -1,7 +1,7 @@
 ---
 title: "ALP Refugee inclusion"
 author: "Claire Adida, Adeline Lo & Melina Platas Izama"
-date: "6/17/2018"
+date: "7/2/2018"
 output: pdf_document
 fontsize: 10pt
 geometry: margin=0.75in
@@ -871,6 +871,16 @@ clx(h12a)
 
 There is a small positive, empathy effect (coefficient=0.010352) on likelihood of being in favor of taking in Syrian refugees who pass screening, though this is at a pvalue of 0.0638717.
 
+Below for robustness check with logistic regression:
+```{r,echo=FALSE}
+#logistic
+library(rms)
+fit=lrm(y4 ~ Empathy+sex+Empathy*sex+birthyr+Empathy*birthyr+immigrant2+Empathy*immigrant2+educ+Empathy*educ+religpew+Empathy*religpew + partyid3_names + Empathy*partyid3_names +ethnocentric1 + Empathy*ethnocentric1, x=T, y=T, data=ControlEmpathy.data.w1)
+robcov(fit, cluster=ControlEmpathy.data.w1$caseid) 
+#bootcov(fit, cluster=ControlEmpathy.data.w1$caseid) 
+
+```
+
 ### H12b: (Persuasion effect on screening)
 The persuasion treatment will significantly increase the respondent’s reported inclusionary attitude for the U.S. taking in Syrian refugees who pass a government security screening. We use `ControlPersuasion.data.w1`.
 ```{r,echo=FALSE}
@@ -878,6 +888,16 @@ h12b<-lm(y4 ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+immigrant
 clx(h12b)
 ```
 There is no statistically significant effect of persuasion on screening (Y4).
+
+```{r,echo=FALSE}
+#logistic,#religpew offending, remove
+library(rms)
+fit=lrm(y4 ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+immigrant2+Persuasion*immigrant2+educ+Persuasion*educ#+religpew+Persuasion*religpew 
+        + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1, x=T, y=T, data=ControlPersuasion.data.w1)
+robcov(fit, cluster=ControlPersuasion.data.w1$caseid) 
+#bootcov(fit, cluster=ControlPersuasion.data.w1$caseid) 
+
+```
 
 ### H13a: (Empathy effect on difference in scores of refugee pair)
 The empathy prime will significantly decrease the magnitude of the average difference in admission scores across refugee pairs (i.e. reduce discrimination on any basis). We use `ControlEmpathy.data.y2y3` and create a variable `diffy2y3` that is the absolute difference between the respondent's reported score for $Y2$ and for $Y3$ in wave 1.
@@ -1142,3 +1162,23 @@ clx(party.time4,ControlPersuasion.data.y2$caseid)
 
 
 
+
+
+```{r}
+#average refugee rating for those who wrote a letter (group 1) and those who did not (group 0): all controls
+t.test(y2~Y6_new,data=Control.data.y2)#use Y6 for
+  #just wave 1
+t.test(y2~Y6_new,data=Control.data.y2.w1)
+#average refugee rating for those who wrote a letter (group 1) and those who did not (group 0): only Dems
+t.test(y2~Y6_new,data=subset(Control.data.y2,partyid3_names=="Democrat"))
+  #just wave 1
+t.test(y2~Y6_new,data=subset(Control.data.y2.w1,partyid3_names=="Democrat"))
+#average refugee rating for those who wrote a letter (group 1) and those who did not (group 0): only Independents
+t.test(y2~Y6_new,data=subset(Control.data.y2,partyid3_names=="Independent"))
+  #just wave 1
+t.test(y2~Y6_new,data=subset(Control.data.y2.w1,partyid3_names=="Independent"))
+#average refugee rating for those who wrote a letter (group 1) and those who did not (group 0): only Republicans
+t.test(y2~Y6_new,data=subset(Control.data.y2,partyid3_names=="Republican"))
+  #just wave 1
+t.test(y2~Y6_new,data=subset(Control.data.y2.w1,partyid3_names=="Republican"))
+```
