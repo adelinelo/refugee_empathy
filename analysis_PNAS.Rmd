@@ -56,6 +56,8 @@ library(plotly)
 library(calibrate)
 require(XML)
 library(memisc)
+#for direct effects
+library(DirectEffects)
 load("replicationdata.RData")
 ```
 
@@ -1181,4 +1183,36 @@ t.test(y2~Y6_new,data=subset(Control.data.y2.w1,partyid3_names=="Independent"))
 t.test(y2~Y6_new,data=subset(Control.data.y2,partyid3_names=="Republican"))
   #just wave 1
 t.test(y2~Y6_new,data=subset(Control.data.y2.w1,partyid3_names=="Republican"))
+```
+
+
+# ACDE for nudge hypothesis: are people who are most likely to respond to treatment with writing letters also maxed out on ratings values?
+
+```{r}
+install_github("mattblackwell/DirectEffects", ref = "master")
+library(DirectEffects)
+# Creating the mediator
+ControlEmpathy.data.y2.w1$y2binary<-ifelse(ControlEmpathy.data.y2.w1$y2==7|ControlEmpathy.data.y2.w1$y2==6,1,0)
+first<-lm(Y6_new ~ Empathy + y2binary,data=ControlEmpathy.data.y2.w1)
+Y6_new.mediator.predicted <- ControlEmpathy.data.y2.w1$y2binary * coef(first)[3]
+Y6_new.mediator.adjusted<-ControlEmpathy.data.y2.w1$Y6_new-Y6_new.mediator.predicted
+ControlEmpathy.data.y2.w1.version_1<-cbind(ControlEmpathy.data.y2.w1,Y6_new.mediator.adjusted)
+# Subset for low
+ControlEmpathy.data.y2.w1.version_1.low_rating<-ControlEmpathy.data.y2.w1.version_1[which(ControlEmpathy.data.y2.w1.version_1$y2binary==0),]
+# Subset for high
+ControlEmpathy.data.y2.w1.version_1.high_rating<-ControlEmpathy.data.y2.w1.version_1[which(ControlEmpathy.data.y2.w1.version_1$y2binary==1),]
+low_rating.predicted<-lm(Y6_new.mediator.adjusted ~ Empathy,data=ControlEmpathy.data.y2.w1.version_1.low_rating)
+summary(low_rating.predicted)
+high_rating.predicted<-lm(Y6_new.mediator.adjusted ~ Empathy,data=ControlEmpathy.data.y2.w1.version_1.high_rating)
+summary(high_rating.predicted)
+#bootstrapped s.e. for coefficient on Empathy
+#get Beta fn
+beta <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample 
+  fit <- lm(formula, data=d)
+  return(coef(fit)[2])
+} 
+# bootstrapping with 10000 replications 
+results_low <- boot(data=ControlEmpathy.data.y2.w1.version_1.low_rating, statistic=beta, R=10000, formula=Y6_new.mediator.adjusted ~ Empathy +  sex)
+results_high <- boot(data=ControlEmpathy.data.y2.w1.version_1.high_rating, statistic=beta, R=10000, formula=Y6_new.mediator.adjusted ~ Empathy +  sex)
 ```
