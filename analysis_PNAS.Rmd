@@ -39,6 +39,7 @@ The original data is set up to reflect the YouGov data storage system, which req
 ```{r setup, include=FALSE}
 rm(list=ls())
 # libraries
+library(boot)
 library(mvtnorm)
 library(rms)
 library(haven)
