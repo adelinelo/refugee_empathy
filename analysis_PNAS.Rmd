@@ -39,10 +39,12 @@ The original data is set up to reflect the YouGov data storage system, which req
 ```{r setup, include=FALSE}
 rm(list=ls())
 # libraries
+library(mvtnorm)
+library(rms)
 library(haven)
 library(pander)
-library(dplyr)
 library(plyr)
+library(dplyr)
 library(sandwich)
 library(lmtest)
 library(data.table)
@@ -893,7 +895,7 @@ There is no statistically significant effect of persuasion on screening (Y4).
 
 ```{r,echo=FALSE}
 #logistic,#religpew offending, remove
-library(rms)
+
 fit=lrm(y4 ~ Persuasion+sex+Persuasion*sex+birthyr+Persuasion*birthyr+immigrant2+Persuasion*immigrant2+educ+Persuasion*educ#+religpew+Persuasion*religpew 
         + partyid3_names + Persuasion*partyid3_names +ethnocentric1 + Persuasion*ethnocentric1, x=T, y=T, data=ControlPersuasion.data.w1)
 robcov(fit, cluster=ControlPersuasion.data.w1$caseid) 
